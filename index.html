@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Play Zone</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1b1464">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#15104a;--bg2:#2f23a8;--accent:#ffb300;--green:#27c26a;--ink:#fff}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:linear-gradient(160deg,var(--bg),var(--bg2));overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer;border:0;-webkit-tap-highlight-color:transparent}
+.screen{position:fixed;inset:0;display:none;flex-direction:column}
+.screen.on{display:flex}
+
+/* Home */
+#home{align-items:center;justify-content:center;gap:28px;padding:24px}
+.blk{position:absolute;bottom:-80px;border-radius:14px;opacity:.2;animation:rise linear infinite}
+@keyframes rise{to{transform:translateY(-130vh) rotate(360deg)}}
+.title{font-size:2.2rem;font-weight:800;letter-spacing:.02em;z-index:1;text-shadow:0 4px 0 rgba(0,0,0,.25)}
+.play{z-index:1;width:150px;height:150px;border-radius:50%;background:var(--green);display:grid;place-items:center;box-shadow:0 10px 0 #178a47,0 24px 40px rgba(0,0,0,.35);transition:transform .1s}
+.play:active{transform:translateY(6px);box-shadow:0 4px 0 #178a47,0 12px 24px rgba(0,0,0,.35)}
+.play svg{width:64px;height:64px;margin-left:8px}
+.row2{display:flex;gap:14px;z-index:1}
+.pill{padding:14px 26px;border-radius:16px;background:rgba(255,255,255,.16);font-weight:700;font-size:1.05rem;backdrop-filter:blur(6px)}
+.pill:active{background:rgba(255,255,255,.28)}
+
+/* Modals */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;z-index:20;padding:16px}
+.modal.on{display:grid}
+.card{background:#fff;color:#1b1464;border-radius:22px;padding:22px;width:min(100%,340px);display:flex;flex-direction:column;gap:12px}
+.card h3{margin:0;font-size:1.2rem}
+.card input{font:inherit;padding:13px 14px;border:2px solid #d8d4f5;border-radius:12px;outline:0;color:#1b1464}
+.card input:focus{border-color:var(--bg2)}
+.card .b{padding:12px;border-radius:12px;background:#eeeafd;color:#1b1464;font-weight:700}
+.card .b.red{background:#ffe3e0;color:#b42318}
+.card .b.main{background:var(--bg2);color:#fff}
+
+/* Chat */
+#chat header{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;background:rgba(0,0,0,.22)}
+#chat header button{background:none;font-size:1.5rem;padding:4px 10px}
+#chat header b{font-size:1.1rem}
+#net{display:none;background:#b42318;text-align:center;font-size:.85rem;padding:5px}
+#net.on{display:block}
+#msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;flex-direction:column;max-width:82%}
+.row.mine{align-self:flex-end;align-items:flex-end}
+.row.theirs{align-self:flex-start;align-items:flex-start}
+.bubble{padding:9px 13px;border-radius:18px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;cursor:pointer}
+.mine .bubble{background:var(--accent);color:#2b1d00;border-bottom-right-radius:6px}
+.theirs .bubble{background:rgba(255,255,255,.17);border-bottom-left-radius:6px}
+.bubble.del{background:transparent!important;color:rgba(255,255,255,.65)!important;border:1px dashed rgba(255,255,255,.35);font-style:italic}
+.meta{font-size:.72rem;opacity:.75;margin:2px 6px}
+.meta.fail{color:#ff9d94;opacity:1;font-weight:700}
+.note{margin:auto;text-align:center;opacity:.8;max-width:300px}
+#emoji{display:none;grid-template-columns:repeat(8,1fr);gap:2px;padding:8px;background:rgba(0,0,0,.3);max-height:150px;overflow-y:auto}
+#emoji.on{display:grid}
+#emoji button{background:none;font-size:1.5rem;padding:4px}
+.composer{display:flex;align-items:flex-end;gap:8px;padding:10px 10px calc(env(safe-area-inset-bottom,0px) + 10px);background:rgba(0,0,0,.22)}
+.composer textarea{flex:1;min-width:0;font:inherit;resize:none;max-height:120px;padding:11px 14px;border-radius:20px;border:0;outline:0;background:#fff;color:#1b1464}
+.ib{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.16);font-size:1.3rem;flex:none}
+.ib.send{background:var(--accent);color:#2b1d00;font-weight:800}
+#count{display:none;align-self:center;font-size:.72rem;font-weight:700;background:#ffe08a;color:#6b4a00;padding:4px 7px;border-radius:10px;text-align:center;max-width:74px;line-height:1.2}
+#count.on{display:block}
+#count.danger{background:#ffb4ab;color:#8a1209}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.blk{animation:none}}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<section id="home" class="screen on">
+  <div class="title">Play Zone</div>
+  <button class="play" id="playBtn" aria-label="Play">
+    <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>
+  </button>
+  <div class="row2">
+    <button class="pill" id="setBtn">Settings</button>
+    <button class="pill" id="storeBtn">Store</button>
+  </div>
+</section>
+
+<!-- CHAT -->
+<section id="chat" class="screen">
+  <header><button id="backBtn" aria-label="Back">&#8592;</button><b>Chat</b></header>
+  <div id="net">No internet connection</div>
+  <div id="msgs" aria-live="polite"></div>
+  <div id="emoji"></div>
+  <div class="composer">
+    <button class="ib" id="emojiBtn" aria-label="Emoji">&#128512;</button>
+    <textarea id="input" rows="1" placeholder="Type a message" aria-label="Message"></textarea>
+    <span id="count"></span>
+    <button class="ib send" id="sendBtn" aria-label="Send">&#10148;</button>
+  </div>
+</section>
+
+<!-- Password box -->
+<div class="modal" id="pwModal">
+  <div class="card">
+    <h3>Settings</h3>
+    <input id="pw" type="password" placeholder="Password" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button class="b" id="pwCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Who are you (first time only) -->
+<div class="modal" id="roleModal">
+  <div class="card">
+    <h3>Who are you?</h3>
+    <button class="b main" data-role="L">L</button>
+    <button class="b main" data-role="S">S</button>
+  </div>
+</div>
+
+<!-- Message menu -->
+<div class="modal" id="menuModal">
+  <div class="card" id="menuCard"></div>
+</div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,doc,setDoc,updateDoc,onSnapshot,query,orderBy,arrayUnion} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ====== SETTINGS YOU CAN CHANGE ====== */
+const firebaseConfig = {
+  apiKey: "PASTE_HERE",
+  authDomain: "PASTE_HERE",
+  projectId: "PASTE_HERE",
+  appId: "PASTE_HERE"
+};
+const PASSWORD = "L+S";   // not case sensitive
+const MAX_WORDS = 300;    // longest message allowed
+const WARN_AT = 100;      // warning starts when this many words are left
+const DANGER_AT = 50;     // warning turns red here
+/* ===================================== */
+
+const $ = id => document.getElementById(id);
+const configured = !String(firebaseConfig.apiKey).startsWith("PASTE");
+let db, role = null, chatOn = false, ready = false;
+const server = new Map(), local = new Map();
+
+/* ---------- Home ---------- */
+(function blocks(){
+  const colors = ["#ffb300","#27c26a","#ff5c8a","#4dc3ff","#ffffff"];
+  for (let i = 0; i < 18; i++) {
+    const b = document.createElement("div");
+    const s = 24 + Math.random() * 56;
+    b.className = "blk";
+    b.style.cssText = `left:${Math.random()*100}%;width:${s}px;height:${s}px;background:${colors[i%5]};animation-duration:${9+Math.random()*12}s;animation-delay:-${Math.random()*15}s`;
+    $("home").appendChild(b);
+  }
+})();
+$("playBtn").onclick = () => {};
+$("storeBtn").onclick = () => {};
+$("setBtn").onclick = () => { $("pwModal").classList.add("on"); $("pw").value = ""; setTimeout(() => $("pw").focus(), 50); };
+$("pwCancel").onclick = () => $("pwModal").classList.remove("on");
+$("pw").addEventListener("input", () => {
+  if ($("pw").value.replace(/\s/g, "").toUpperCase() === PASSWORD.toUpperCase()) {
+    $("pw").value = "";
+    $("pwModal").classList.remove("on");
+    openChat();
+  }
+});
+
+/* ---------- Chat open / close ---------- */
+function openChat() {
+  role = localStorage.getItem("pz_role");
+  if (!role) { $("roleModal").classList.add("on"); return; }
+  showChat();
+}
+document.querySelectorAll("[data-role]").forEach(b => b.onclick = () => {
+  role = b.dataset.role;
+  try { localStorage.setItem("pz_role", role); } catch (e) {}
+  $("roleModal").classList.remove("on");
+  showChat();
+});
+function showChat() {
+  $("home").classList.remove("on");
+  $("chat").classList.add("on");
+  chatOn = true;
+  $("net").classList.toggle("on", !navigator.onLine);
+  start();
+  render(true);
+  markSeen();
+}
+$("backBtn").onclick = () => {
+  chatOn = false;
+  $("emoji").classList.remove("on");
+  $("chat").classList.remove("on");
+  $("home").classList.add("on");
+};
+addEventListener("online", () => $("net").classList.remove("on"));
+addEventListener("offline", () => $("net").classList.add("on"));
+document.addEventListener("visibilitychange", markSeen);
+addEventListener("focus", markSeen);
+
+/* ---------- Firebase ---------- */
+async function start() {
+  if (ready || !configured) return;
+  ready = true;
+  try {
+    const app = initializeApp(firebaseConfig);
+    await signInAnonymously(getAuth(app));
+    db = getFirestore(app);
+    onSnapshot(query(collection(db, "chat"), orderBy("ts")), snap => {
+      snap.forEach(d => server.set(d.id, {...d.data(), id: d.id, _p: d.metadata.hasPendingWrites}));
+      snap.docChanges().forEach(c => { if (c.type === "removed") server.delete(c.doc.id); });
+      server.forEach((m, id) => { if (local.has(id)) local.delete(id); });
+      render();
+      markSeen();
+    }, () => { ready = false; });
+  } catch (e) { ready = false; }
+}
+function markSeen() {
+  if (!chatOn || document.hidden || !db) return;
+  server.forEach(m => {
+    if (m.from !== role && !m.seenAt && !m._p) {
+      updateDoc(doc(db, "chat", m.id), {seenAt: Date.now()}).catch(() => {});
+    }
+  });
+}
+
+/* ---------- Sending ---------- */
+const words = t => (t.match(/\S+/g) || []).length;
+function send() {
+  const text = $("input").value.trim();
+  if (!text) return;
+  if (!configured) { render(); return; }
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const m = {id, from: role, text, ts: Date.now(), seenAt: null, deleted: false, hiddenFor: []};
+  $("input").value = "";
+  fit();
+  if (!navigator.onLine || !db) { local.set(id, {...m, failed: true}); render(true); return; }
+  local.set(id, {...m, pending: true});
+  render(true);
+  push(m);
+}
+function push(m) {
+  Promise.race([
+    setDoc(doc(db, "chat", m.id), m),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))
+  ]).catch(() => {
+    const l = local.get(m.id);
+    if (l) { l.failed = true; l.pending = false; render(); }
+  });
+}
+function retry(m) {
+  const base = {id: m.id, from: m.from, text: m.text, ts: m.ts, seenAt: null, deleted: false, hiddenFor: []};
+  if (!navigator.onLine || !db) return;
+  local.set(m.id, {...base, pending: true});
+  render();
+  push(base);
+}
+
+/* ---------- Rendering ---------- */
+function ago(t) {
+  const s = (Date.now() - t) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " h ago";
+  return new Date(t).toLocaleDateString();
+}
+function render(force) {
+  const box = $("msgs");
+  const near = force || box.scrollHeight - box.scrollTop - box.clientHeight < 140;
+  box.innerHTML = "";
+  if (!configured) {
+    box.innerHTML = '<div class="note">Chat is not connected yet. Paste your Firebase config into index.html.</div>';
+    return;
+  }
+  const list = [...server.values()].filter(m => !(m.hiddenFor || []).includes(role));
+  local.forEach(m => { if (!server.has(m.id)) list.push(m); });
+  list.sort((a, b) => a.ts - b.ts);
+  const mine = list.filter(m => m.from === role);
+  const lastMine = mine[mine.length - 1];
+  list.forEach(m => {
+    const isMine = m.from === role;
+    const row = document.createElement("div");
+    row.className = "row " + (isMine ? "mine" : "theirs");
+    const b = document.createElement("div");
+    b.className = "bubble" + (m.deleted ? " del" : "");
+    b.textContent = m.deleted ? "This message was deleted" : m.text;
+    b.onclick = () => menu(m);
+    row.appendChild(b);
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const time = new Date(m.ts).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+    if (m.failed) { meta.className += " fail"; meta.textContent = "Failed to send \u00b7 tap to retry"; meta.onclick = () => retry(m); meta.style.cursor = "pointer"; }
+    else if (isMine && (m.pending || m._p)) meta.textContent = "Sending\u2026";
+    else if (isMine && m === lastMine) meta.textContent = time + " \u00b7 " + (m.seenAt && !m.deleted ? "Seen " + ago(m.seenAt) : "Sent");
+    else meta.textContent = time;
+    row.appendChild(meta);
+    box.appendChild(row);
+  });
+  if (near) box.scrollTop = box.scrollHeight;
+}
+setInterval(() => { if (chatOn) render(); }, 30000);
+
+/* ---------- Delete menu ---------- */
+function menu(m) {
+  const c = $("menuCard");
+  c.innerHTML = "";
+  const add = (label, cls, fn) => {
+    const b = document.createElement("button");
+    b.className = "b " + cls; b.textContent = label;
+    b.onclick = () => { $("menuModal").classList.remove("on"); fn && fn(); };
+    c.appendChild(b);
+  };
+  if (m.failed) {
+    add("Retry", "main", () => retry(m));
+    add("Delete", "red", () => { local.delete(m.id); render(); });
+  } else {
+    add("Delete for me", "", () => updateDoc(doc(db, "chat", m.id), {hiddenFor: arrayUnion(role)}).catch(() => {}));
+    if (m.from === role && !m.deleted) add("Delete for everyone", "red", () => updateDoc(doc(db, "chat", m.id), {deleted: true, text: ""}).catch(() => {}));
+  }
+  add("Cancel", "", null);
+  $("menuModal").classList.add("on");
+}
+$("menuModal").onclick = e => { if (e.target === $("menuModal")) $("menuModal").classList.remove("on"); };
+
+/* ---------- Composer: emoji, word limit, resize ---------- */
+const EMOJI = "😀 😃 😄 😁 😆 😅 😂 🤣 🙂 😉 😊 😇 🥰 😍 🤩 😘 😗 😋 😜 🤪 🤗 🤭 🤔 😏 😌 😴 🥺 😢 😭 😤 😡 🥳 😎 🤓 😳 🙈 👍 👎 👏 🙌 🙏 💪 👋 ✌️ 🤞 ❤️ 🧡 💛 💚 💙 💜 🖤 💔 💕 💖 💘 🔥 ✨ 🎉 🎮 ⭐ 🌹 🌙 ☀️ 🍕 🍫 ☕ 🎵".split(" ");
+EMOJI.forEach(e => {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = e;
+  b.onclick = () => { $("input").value += e; fit(); $("input").focus(); };
+  $("emoji").appendChild(b);
+});
+$("emojiBtn").onclick = () => $("emoji").classList.toggle("on");
+$("sendBtn").onclick = send;
+$("input").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+$("input").addEventListener("input", fit);
+function fit() {
+  const ta = $("input");
+  const re = /\S+/g; let m, n = 0, cut = -1;
+  while ((m = re.exec(ta.value))) { n++; if (n === MAX_WORDS) cut = re.lastIndex; }
+  if (n > MAX_WORDS) ta.value = ta.value.slice(0, cut);
+  const left = MAX_WORDS - words(ta.value);
+  const c = $("count");
+  c.classList.toggle("on", left <= WARN_AT);
+  c.classList.toggle("danger", left <= DANGER_AT);
+  c.textContent = "\u26a0 " + left + (left === 1 ? " word left" : " words left");
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+}
+
+if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+</script>
+</body>
+</html>
